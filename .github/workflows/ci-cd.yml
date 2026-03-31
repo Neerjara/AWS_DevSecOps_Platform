@@ -1,0 +1,43 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+
+    - name: Install dependencies
+      run: pip install -r app/requirements.txt
+
+    - name: Sonar Scan
+      run: |
+        sonar-scanner \
+        -Dsonar.projectKey=devsecops \
+        -Dsonar.sources=.
+
+    - name: Build Docker Image
+      run: docker build -t ${{ secrets.ECR_URL }}:latest ./app
+
+    - name: Trivy Scan
+      run: bash security/trivy-scan.sh ${{ secrets.ECR_URL }}:latest
+
+    - name: Push to ECR
+      run: |
+        aws ecr get-login-password --region us-east-1 | \
+        docker login --username AWS --password-stdin ${{ secrets.ECR_URL }}
+
+        docker push ${{ secrets.ECR_URL }}:latest
+
+    - name: Deploy to EKS
+      run: |
+        aws eks update-kubeconfig --name devsecops-cluster
+        kubectl apply -f k8s/
