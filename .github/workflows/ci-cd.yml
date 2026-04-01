@@ -13,7 +13,6 @@ jobs:
 build-deploy:
 runs-on: ubuntu-latest
 
-```
 steps:
   - name: Checkout
     uses: actions/checkout@v4
@@ -91,4 +90,3 @@ steps:
     run: |
       aws eks update-kubeconfig --region $AWS_REGION --name devsecops-cluster
       kubectl apply -f k8s/
-```
