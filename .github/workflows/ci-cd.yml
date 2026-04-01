@@ -1,28 +1,26 @@
 name: DevSecOps Pipeline
 
 on:
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
 
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-```
-steps:
-  - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-  - uses: actions/setup-python@v4
-    with:
-      python-version: "3.11"
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-  - run: pip install -r app/requirements.txt
+      - run: pip install -r app/requirements.txt
 
-  - run: npm install -g sonar-scanner
+      - run: npm install -g sonar-scanner
 
-  - name: Sonar Scan
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    run: sonar-scanner -Dsonar.projectKey=Neerjara_AWS_DevSecOps_Platform -Dsonar.organization=neerjara -Dsonar.sources=. -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=$SONAR_TOKEN
-```
+      - name: Sonar Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: sonar-scanner -Dsonar.projectKey=Neerjara_AWS_DevSecOps_Platform -Dsonar.organization=neerjara -Dsonar.sources=. -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=$SONAR_TOKEN
