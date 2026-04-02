@@ -1,6 +1,8 @@
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   name    = "devsecops-cluster"
+  version = "21.16.0"
+
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
