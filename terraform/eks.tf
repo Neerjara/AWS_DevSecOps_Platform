@@ -2,7 +2,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.16.0"
 
-  cluster_name = "devsecops-cluster"
+  name = "devsecops-cluster"
 
   kubernetes_version = "1.29"   # 👈 changed name
 
