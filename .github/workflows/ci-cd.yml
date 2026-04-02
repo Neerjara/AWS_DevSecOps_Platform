@@ -1,9 +1,13 @@
-name: DevSecOps Pipeline
+name: DevSecOps OIDC Pipeline
 
 on:
   push:
     branches:
       - main
+
+permissions:
+  id-token: write
+  contents: read
 
 env:
   AWS_REGION: us-east-1
@@ -11,49 +15,96 @@ env:
   IMAGE_TAG: latest
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # 📥 Checkout
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      # 🔍 Debug GitHub Context
+      - name: Debug GitHub Context
+        run: |
+          echo "Repo: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+
+      # 🔐 Configure AWS Credentials (OIDC - MUST COME EARLY)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          python-version: "3.15.0-alpha.7"
+          role-to-assume: arn:aws:iam::078716600663:role/aws-devsecops
+          role-session-name: github-actions-session
+          aws-region: ${{ env.AWS_REGION }}
 
-      - run: pip install -r app/requirements.txt
+      # ✅ Verify AWS Identity
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
 
-      - run: npm install -g sonar-scanner
+      # 🐍 Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
 
+      - name: Install Python Dependencies
+        run: pip install -r app/requirements.txt
+
+      # 🔍 Install Sonar Scanner
+      - name: Install Sonar Scanner
+        run: npm install -g sonar-scanner
+
+      # 🔎 SonarCloud Scan
       - name: Sonar Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: sonar-scanner -Dsonar.projectKey=Neerjara_AWS_DevSecOps_Platform -Dsonar.organization=neerjara -Dsonar.sources=. -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=$SONAR_TOKEN
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=Neerjara_AWS_DevSecOps_Platform \
+            -Dsonar.organization=neerjara \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=$SONAR_TOKEN
 
-      - name: Login to ECR
+      # 🐳 Login to ECR
+      - name: Login to Amazon ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
+      # 🏗 Build Docker Image
       - name: Build Docker Image
         run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./app
 
+      # 🏷 Tag Image
       - name: Tag Docker Image
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # 🔐 Install Trivy
       - name: Install Trivy
-        run: sudo dnf install -y trivy || true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
 
+      # 🔍 Trivy Scan
       - name: Trivy Scan
         run: trivy image --severity HIGH,CRITICAL --exit-code 0 $ECR_REPOSITORY:$IMAGE_TAG
 
+      # 📤 Push Image to ECR
       - name: Push to ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # 🚀 Deploy to EKS
       - name: Deploy to EKS
         run: |
           aws eks update-kubeconfig --region $AWS_REGION --name devsecops-cluster
