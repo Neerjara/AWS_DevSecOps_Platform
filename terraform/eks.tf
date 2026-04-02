@@ -11,7 +11,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
 
       scaling_config = {
         desired_size = 2
