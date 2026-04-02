@@ -1,6 +1,6 @@
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"   # 👈 FIX
+  version = "21.16.0"   # 👈 FIX
 
   cluster_name    = "devsecops-cluster"
   cluster_version = "1.29"
