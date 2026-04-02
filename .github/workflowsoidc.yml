@@ -17,6 +17,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Debug GitHub Context
+      run: |
+      echo "Repo: ${{ github.repository }}"
+      echo "Ref: ${{ github.ref }}"
+
       # 🔐 Configure AWS using OIDC (NO secrets needed)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
